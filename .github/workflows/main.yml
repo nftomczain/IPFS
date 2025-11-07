@@ -1,0 +1,53 @@
+name: 🚀 Deploy site to IPFS (NetNeroJes Infrastructure)
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1️⃣ Pobranie repozytorium
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # 2️⃣ Instalacja IPFS (Kubo CLI)
+      - name: Install IPFS (Kubo)
+        run: |
+          wget -q https://github.com/ipfs/kubo/releases/download/v0.30.0/kubo_v0.30.0_linux-amd64.tar.gz
+          tar -xzf kubo_v0.30.0_linux-amd64.tar.gz
+          sudo bash kubo/install.sh
+          ipfs version
+
+      # 3️⃣ Dodanie katalogu site/ do IPFS
+      - name: Add site directory to IPFS
+        id: add_ipfs
+        run: |
+          CID=$(ipfs add -Qr site)
+          echo "📦 Added site/ to IPFS → $CID"
+          echo "CID=$CID" >> $GITHUB_ENV
+
+      # 4️⃣ (opcjonalnie) Przypięcie CID w Pinata (jeśli token ustawiony)
+      - name: Pin to Pinata
+        if: env.PINATA_JWT != ''
+        env:
+          PINATA_JWT: ${{ secrets.PINATA_JWT }}
+          CID: ${{ env.CID }}
+        run: |
+          echo "🔗 Pinning CID to Pinata..."
+          curl -s -X POST "https://api.pinata.cloud/pinning/pinByHash" \
+            -H "Authorization: Bearer $PINATA_JWT" \
+            -H "Content-Type: application/json" \
+            -d "{\"hashToPin\": \"$CID\", \"name\": \"NetNeroJes-site\"}"
+          echo "✅ Pinned: $CID"
+
+      # 5️⃣ Wyświetlenie wyniku
+      - name: Show final result
+        run: |
+          echo "=============================================="
+          echo "🌍 NetNeroJes Posten Infrastruktura - IPFS CID"
+          echo "🔹 CID: $CID"
+          echo "🔹 Gateway: https://ipfs.io/ipfs/$CID"
+          echo "=============================================="
